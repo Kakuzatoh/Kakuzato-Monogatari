@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8" />
+  <title>Kakuzato Monogatari</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background-color: #0a0a1f;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Äänet -->
+<audio id="characterSelectMusic" src="https://Kakuzatoh.github.io/Kakuzato-Monogatari/Audio/characterselectbgm.mp3" loop></audio>
+<audio id="jumpSound" src="https://Kakuzatoh.github.io/Kakuzato-Monogatari/Audio/jump.mp3"></audio>
+<audio id="bgMusic" src="https://Kakuzatoh.github.io/Kakuzato-Monogatari/Audio/backgroundmusic.mp3" loop></audio>
+<audio id="gameTitleVoice" src="https://Kakuzatoh.github.io/Kakuzato-Monogatari/Audio/title.m4a"></audio>
+
+<script>
+const SPRITES = [
+  { key: 'player0', url: 'https://i.imgur.com/EjiB0ZH.png' },
+  { key: 'player1', url: 'https://i.imgur.com/ANsJaYW.png' },
+  { key: 'player2', url: 'https://i.imgur.com/bWRbq3m.png' },
+  { key: 'player3', url: 'https://i.imgur.com/KmbvXGP.png' },
+  { key: 'player4', url: 'https://i.imgur.com/8L9VHBr.png' },
+  { key: 'player5', url: 'https://i.imgur.com/bwYGawW.png' },
+  { key: 'player6', url: 'https://i.imgur.com/IGd63Ac.png' },
+];
+
+let selectedIndex = 0;
+
+class TitleScreen extends Phaser.Scene {
+  constructor() { super('TitleScreen'); }
+
+  preload() {
+    this.load.image('logo1', 'https://i.imgur.com/QiH3HDO.png');
+    this.load.image('logo2', 'https://i.imgur.com/vSdj23U.png');
+    this.load.image('snowflake', 'https://i.imgur.com/YWZ7i8f.png');
+  }
+
+  create() {
+    const centerX = this.cameras.main.width / 2;
+    const centerY = this.cameras.main.height / 2;
+
+    this.add.image(centerX - 100, centerY, 'logo1').setScale(0.3);
+    this.add.image(centerX + 150, centerY, 'logo2').setScale(0.7);
+
+    const kanjiY = centerY;
+    const kanjiScale = 0.3;
+    const kanjiHeight = 240 * kanjiScale;
+    const textY = kanjiY + kanjiHeight / 2 + 10;
+
+    this.add.text(centerX - 120, textY, 'Kakuzato Productions', {
+      fontSize: '16px',
+      fill: '#ffffff'
+    }).setOrigin(0.5, 0);
+
+    this.add.text(centerX - 145, centerY + 150, 'Push ENTER to start', {
+      fontSize: '20px',
+      fill: '#fff'
+    }).setOrigin(0.5);
+
+    this.snowEmitter = this.add.particles(0, 0, 'snowflake', {
+      x: { min: 0, max: 800 },
+      y: 0,
+      lifespan: 6000,
+      speedY: { min: 50, max: 100 },
+      scale: { start: 0.02, end: 0.02 },
+      quantity: 3,
+      frequency: 100,
+      blendMode: 'NORMAL'
+    }).setDepth(-1);
+
+    this.characterSelectMusic = document.getElementById('characterSelectMusic');
+    this.titleVoice = document.getElementById('gameTitleVoice');
+    this.characterSelectMusic.volume = 0.3;
+    this.titleVoice.volume = 0.8;
+
+    // Soita taustamusiikki, kun painetaan mitä tahansa nappia (vain kerran)
+    this.input.keyboard.once('keydown', () => {
+      if (this.characterSelectMusic.paused) {
+        this.characterSelectMusic.play().catch(() => {});
+      }
+    });
+
+    // Kun painetaan ENTER, soita pelin nimi ja siirry valikkoon
+    this.input.keyboard.once('keydown-ENTER', () => {
+      this.titleVoice.play().catch(() => {});
+      this.scene.start('CharacterSelect');
+    });
+  }
+
+  update() {
+    const cam = this.cameras.main;
+    this.snowEmitter.setPosition(cam.scrollX, 0);
+  }
+}
+
+class CharacterSelect extends Phaser.Scene {
+  constructor() { super('CharacterSelect'); }
+
+  preload() {
+    for (let sheet of SPRITES) {
+      this.load.spritesheet(sheet.key, sheet.url, { frameWidth: 240, frameHeight: 240 });
+    }
+    this.load.image('snowflake', 'https://i.imgur.com/YWZ7i8f.png');
+  }
+
+  create() {
+    this.characterSelectMusic = document.getElementById('characterSelectMusic');
+    this.jumpSound = document.getElementById('jumpSound');
+    this.bgMusic = document.getElementById('bgMusic');
+
+    this.characterSelectMusic.volume = 0.3;
+
+    this.add.text(400, 60, 'Pick a character', { fontSize: '20px', fill: '#ffffff' }).setOrigin(0.5);
+
+    this.playerSprite = this.add.sprite(400, 300, SPRITES[selectedIndex].key);
+    this.playerSprite.setScale(0.27).setCrop(20, 0, 200, 230);
+
+    this.createAnimationsForIndex(selectedIndex);
+    this.playerSprite.anims.play('idle_' + selectedIndex);
+
+    this.snowEmitter = this.add.particles(0, 0, 'snowflake', {
+      x: { min: 0, max: 800 },
+      y: 0,
+      lifespan: 6000,
+      speedY: { min: 50, max: 100 },
+      scale: { start: 0.02, end: 0.02 },
+      quantity: 3,
+      frequency: 100,
+      blendMode: 'NORMAL'
+    }).setDepth(-1);
+
+    this.input.keyboard.on('keydown-LEFT', () => {
+      selectedIndex = (selectedIndex - 1 + SPRITES.length) % SPRITES.length;
+      this.changeCharacter();
+    });
+
+    this.input.keyboard.on('keydown-RIGHT', () => {
+      selectedIndex = (selectedIndex + 1) % SPRITES.length;
+      this.changeCharacter();
+    });
+
+    this.input.keyboard.on('keydown-ENTER', () => {
+      this.characterSelectMusic.pause();
+      this.bgMusic.volume = 0.3;
+      this.bgMusic.play().catch(() => {});
+      this.scene.start('Level1', {
+        playerKey: SPRITES[selectedIndex].key,
+        bgMusic: this.bgMusic,
+        jumpSound: this.jumpSound
+      });
+    });
+  }
+
+  update() {
+    const cam = this.cameras.main;
+    this.snowEmitter.setPosition(cam.scrollX, 0);
+  }
+
+  createAnimationsForIndex(index) {
+    const key = SPRITES[index].key;
+    if (!this.anims.exists('idle_' + index)) {
+      this.anims.create({
+        key: 'idle_' + index,
+        frames: this.anims.generateFrameNumbers(key, { start: 6, end: 8 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+      this.anims.create({
+        key: 'walk_' + index,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: 2 }),
+        frameRate: 10,
+        repeat: -1,
+      });
+      this.anims.create({
+        key: 'jump_' + index,
+        frames: this.anims.generateFrameNumbers(key, { start: 3, end: 5 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+    }
+  }
+
+  changeCharacter() {
+    this.playerSprite.anims.stop();
+    this.playerSprite.setTexture(SPRITES[selectedIndex].key);
+    this.playerSprite.setCrop(20, 0, 200, 230);
+    this.createAnimationsForIndex(selectedIndex);
+    this.playerSprite.anims.play('idle_' + selectedIndex);
+  }
+}
+
+class Level1 extends Phaser.Scene {
+  constructor() { super('Level1'); }
+
+  init(data) {
+    this.playerKey = data.playerKey;
+    this.bgMusic = data.bgMusic;
+    this.jumpSound = data.jumpSound;
+  }
+
+  preload() {
+    this.load.image('snowflake', 'https://i.imgur.com/YWZ7i8f.png');
+    this.load.image('ground', 'https://labs.phaser.io/assets/sprites/platform.png');
+    this.load.image('flag', 'https://i.postimg.cc/8Cz5C1ZQ/flag.png');
+    this.load.image('obstacle_static', 'https://i.postimg.cc/QMz6MJpQ/lohisushi.png');
+    this.load.image('obstacle_moving', 'https://i.postimg.cc/HLvLcfNJ/ebisushi.png');
+    this.load.image('obstacle_third', 'https://i.postimg.cc/63RDJmD2/ramen.png');
+    const sheet = SPRITES.find(s => s.key === this.playerKey);
+    if (sheet) this.load.spritesheet(sheet.key, sheet.url, { frameWidth: 240, frameHeight: 240 });
+  }
+
+  create() {
+    this.anims.create({ key: 'idle', frames: this.anims.generateFrameNumbers(this.playerKey, { start: 6, end: 8 }), frameRate: 6, repeat: -1 });
+    this.anims.create({ key: 'walk', frames: this.anims.generateFrameNumbers(this.playerKey, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
+    this.anims.create({ key: 'jump', frames: this.anims.generateFrameNumbers(this.playerKey, { start: 3, end: 5 }), frameRate: 6, repeat: -1 });
+
+    this.snowEmitter = this.add.particles(0, 0, 'snowflake', {
+      x: { min: 0, max: 800 },
+      y: 0,
+      lifespan: 6000,
+      speedY: { min: 50, max: 100 },
+      scale: { start: 0.02, end: 0.02 },
+      quantity: 3,
+      frequency: 100,
+      blendMode: 'NORMAL'
+    }).setDepth(-1);
+
+    const groundY = 584;
+    this.ground = this.physics.add.staticGroup();
+    for (let x = 0; x < 10000; x += 400)
+      this.ground.create(x, groundY, 'ground').setScale(2).refreshBody();
+
+    this.player = this.physics.add.sprite(100, 450, this.playerKey).setScale(0.27).setCrop(20, 0, 200, 230);
+    this.player.body.setSize(100, 180).setOffset(60, 40);
+    this.player.setCollideWorldBounds(false).play('idle');
+
+    this.physics.add.collider(this.player, this.ground);
+
+    this.obstacles = this.physics.add.group();
+    const types = ['static', 'side', 'updown'];
+
+    for (let i = 0; i < 20; i++) {
+      const x = 400 + i * 300;
+      const type = Phaser.Utils.Array.GetRandom(types);
+      let key = 'obstacle_static';
+      if (type === 'side') key = 'obstacle_moving';
+      if (type === 'updown') key = 'obstacle_third';
+      const y = type === 'updown' ? 520 : 500;
+      const obs = this.obstacles.create(x, y, key).setDisplaySize(32, 32);
+      obs.body.setSize(32, 32).allowGravity = false;
+      obs.passed = false;
+      if (type === 'side')
+        this.tweens.add({ targets: obs, x: x + 50, duration: 1000, yoyo: true, repeat: -1 });
+      if (type === 'updown')
+        this.tweens.add({ targets: obs, y: y - 60, duration: 1000, yoyo: true, repeat: -1 });
+    }
+
+    this.physics.add.collider(this.player, this.obstacles, () => this.restart());
+    this.physics.add.collider(this.obstacles, this.ground);
+
+    this.flag = this.physics.add.staticSprite(400 + 20 * 300 + 100, 500, 'flag').setDisplaySize(40, 60);
+    this.physics.add.collider(this.player, this.flag, () => {
+      alert(`Stage Cleared ${1}!`);
+      this.scene.start('CharacterSelect');
+    });
+
+    this.cameras.main.startFollow(this.player, true, 0.05, 0.05);
+    this.cameras.main.setBounds(0, 0, 100000, 600);
+
+    this.cursors = this.input.keyboard.createCursorKeys();
+
+    this.score = 0;
+    this.scoreText = this.add.text(16, 16, 'Obstacles Cleared: 0', { fontSize: '18px', fill: '#ffffff' }).setScrollFactor(0);
+
+    this.jumpSound = this.jumpSound || document.getElementById('jumpSound');
+
+    this.timerStarted = false;
+    this.elapsedTime = 0;
+    this.timerText = this.add.text(16, 40, 'Time: 0.00s', { fontSize: '18px', fill: '#ffffff' }).setScrollFactor(0);
+  }
+
+  restart() {
+    this.scene.restart({ playerKey: this.playerKey, bgMusic: this.bgMusic, jumpSound: this.jumpSound });
+  }
+
+  update(time, delta) {
+    const cam = this.cameras.main;
+    this.snowEmitter.setPosition(cam.scrollX, 0);
+
+    let vx = 0;
+    if (this.cursors.left.isDown) {
+      vx = -200;
+      this.player.setFlipX(true);
+      if (this.player.body.onFloor()) this.player.play('walk', true);
+    } else if (this.cursors.right.isDown) {
+      vx = 200;
+      this.player.setFlipX(false);
+      if (this.player.body.onFloor()) this.player.play('walk', true);
+    } else if (this.player.body.onFloor()) {
+      this.player.play('idle', true);
+    }
+
+    this.player.setVelocityX(vx);
+
+    if (this.cursors.up.isDown && this.player.body.onFloor()) {
+      this.player.setVelocityY(-420);
+      this.jumpSound.play().catch(() => {});
+      this.player.play('jump', true);
+      if (!this.timerStarted) {
+        this.timerStarted = true;
+        this.elapsedTime = 0;
+      }
+    }
+
+    if (!this.player.body.onFloor()) {
+      this.player.play('jump', true);
+    }
+
+    // Laske aika
+    if (this.timerStarted) {
+      this.elapsedTime += delta;
+      this.timerText.setText('Time: ' + (this.elapsedTime / 1000).toFixed(2) + 's');
+    }
+
+    // Tarkista esteiden ylitykset
+    this.obstacles.getChildren().forEach(obs => {
+      if (!obs.passed && obs.x < this.player.x) {
+        obs.passed = true;
+        this.score++;
+        this.scoreText.setText('Obstacles Cleared: ' + this.score);
+      }
+    });
+  }
+}
+
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { y: 900 },
+      debug: false
+    }
+  },
+  scene: [TitleScreen, CharacterSelect, Level1]
+};
+
+const game = new Phaser.Game(config);
+</script>
+
+</body>
+</html>
