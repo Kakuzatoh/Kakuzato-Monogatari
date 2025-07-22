@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8" />
+  <title>Kakuzato Monogatari</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+  <style>
+    body { margin: 0; background-color: #001040; }
+    canvas { display: block; margin: 0 auto; image-rendering: pixelated; background-color: #001040; }
+  </style>
+</head>
+<body>
+
+<audio id="characterSelectMusic" src="https://Kakuzatoh.github.io/Kakuzato-Monogatari/Audio/characterselectbgm.mp3" loop></audio>
+<audio id="jumpSound" src="https://Kakuzatoh.github.io/Kakuzato-Monogatari/Audio/jump.mp3"></audio>
+<audio id="bgMusic" src="https://Kakuzatoh.github.io/Kakuzato-Monogatari/Audio/backgroundmusic.mp3" loop></audio>
+<audio id="gameTitleVoice" src="https://Kakuzatoh.github.io/Kakuzato-Monogatari/Audio/Title.mp3"></audio>
+
+<script>
+const SPRITES = [
+  { key: 'player0', url: 'https://i.imgur.com/EjiB0ZH.png' },
+  { key: 'player1', url: 'https://i.imgur.com/ANsJaYW.png' },
+  { key: 'player2', url: 'https://i.imgur.com/bWRbq3m.png' },
+  { key: 'player3', url: 'https://i.imgur.com/KmbvXGP.png' },
+  { key: 'player4', url: 'https://i.imgur.com/8L9VHBr.png' },
+  { key: 'player5', url: 'https://i.imgur.com/bwYGawW.png' },
+  { key: 'player6', url: 'https://i.imgur.com/IGd63Ac.png' },
+];
+
+let selectedIndex = 0;
+
+class TitleScreen extends Phaser.Scene {
+  constructor() { super('TitleScreen'); }
+
+  preload() {
+    this.load.image('logo1', 'https://i.imgur.com/uOwxtt9.png');
+    this.load.image('logo2', 'https://i.imgur.com/vSdj23U.png');
+    this.load.image('snowflake', 'https://i.imgur.com/YWZ7i8f.png');
+  }
+
+  create() {
+    const centerX = this.cameras.main.width / 2;
+    const centerY = this.cameras.main.height / 2;
+
+    const logo1 = this.add.image(centerX - 140, centerY, 'logo1').setScale(0.7);
+    logo1.setTint(0xFF10F0);
+    this.add.image(centerX + 150, centerY, 'logo2').setScale(0.7);
+    this.add.text(centerX - 100, centerY + 50, 'Kakuzato Productions', { fontSize: '16px', fill: '#fff' }).setOrigin(0.5);
+    this.startText = this.add.text(centerX, centerY + 170, 'Push ENTER to start', { fontSize: '20px', fill: '#fff' }).setOrigin(0.5);
+
+    this.tweens.add({
+      targets: this.startText,
+      alpha: 0,
+      duration: 1000,
+      yoyo: true,
+      repeat: -1
+    });
+
+    this.snowEmitter = this.add.particles(0, 0, 'snowflake', {
+      x: { min: 0, max: 800 },
+      y: 0,
+      lifespan: 6000,
+      speedY: { min: 100, max: 150 },
+      scale: { start: 0.03, end: 0.03 },
+      quantity: 4,
+      frequency: 100,
+      blendMode: 'NORMAL'
+    }).setDepth(-1);
+
+    const titleVoice = document.getElementById('gameTitleVoice');
+    const music = document.getElementById('characterSelectMusic');
+    this.input.keyboard.once('keydown-ENTER', () => {
+      titleVoice.play().catch(() => {});
+      titleVoice.onended = () => {
+        music.play().catch(() => {});
+        this.scene.start('CharacterSelect');
+      };
+    });
+  }
+
+  update() {
+    this.snowEmitter.setPosition(this.cameras.main.scrollX, 0);
+  }
+}
+
+class CharacterSelect extends Phaser.Scene {
+  constructor() { super('CharacterSelect'); }
+
+  preload() {
+    for (let sheet of SPRITES) {
+      this.load.spritesheet(sheet.key, sheet.url, { frameWidth: 240, frameHeight: 240 });
+    }
+    this.load.image('snowflake', 'https://i.imgur.com/YWZ7i8f.png');
+  }
+
+  create() {
+    const music = document.getElementById('characterSelectMusic');
+    const jump = document.getElementById('jumpSound');
+    const bgm = document.getElementById('bgMusic');
+
+    this.add.text(400, 60, 'Pick a character', { fontSize: '20px', fill: '#fff' }).setOrigin(0.5);
+
+    this.playerSprite = this.add.sprite(400, 300, SPRITES[selectedIndex].key);
+    this.playerSprite.setScale(0.27).setCrop(20, 0, 200, 230);
+
+    this.createAnimationsForIndex(selectedIndex);
+    this.playerSprite.anims.play('idle_' + selectedIndex);
+
+    this.input.keyboard.on('keydown-LEFT', () => {
+      selectedIndex = (selectedIndex - 1 + SPRITES.length) % SPRITES.length;
+      this.changeCharacter();
+    });
+
+    this.input.keyboard.on('keydown-RIGHT', () => {
+      selectedIndex = (selectedIndex + 1) % SPRITES.length;
+      this.changeCharacter();
+    });
+
+    this.input.keyboard.on('keydown-ENTER', () => {
+      music.pause();
+      bgm.volume = 0.3;
+      bgm.play().catch(() => {});
+      this.scene.start('Level1', {
+        playerKey: SPRITES[selectedIndex].key,
+        bgMusic: bgm,
+        jumpSound: jump,
+        levelNumber: 1
+      });
+    });
+
+    this.snowEmitter = this.add.particles(0, 0, 'snowflake', {
+      x: { min: 0, max: 800 },
+      y: 0,
+      lifespan: 6000,
+      speedY: { min: 100, max: 150 },
+      scale: { start: 0.03, end: 0.03 },
+      quantity: 4,
+      frequency: 100,
+      blendMode: 'NORMAL'
+    }).setDepth(-1);
+  }
+
+  createAnimationsForIndex(index) {
+    const key = SPRITES[index].key;
+    if (!this.anims.exists('idle_' + index)) {
+      this.anims.create({
+        key: 'idle_' + index,
+        frames: this.anims.generateFrameNumbers(key, { start: 6, end: 8 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+      this.anims.create({
+        key: 'walk_' + index,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: 2 }),
+        frameRate: 10,
+        repeat: -1,
+      });
+      this.anims.create({
+        key: 'jump_' + index,
+        frames: this.anims.generateFrameNumbers(key, { start: 3, end: 5 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+    }
+  }
+
+  changeCharacter() {
+    this.playerSprite.anims.stop();
+    this.playerSprite.setTexture(SPRITES[selectedIndex].key);
+    this.playerSprite.setCrop(20, 0, 200, 230);
+    this.createAnimationsForIndex(selectedIndex);
+    this.playerSprite.anims.play('idle_' + selectedIndex);
+  }
+
+  update() {
+    this.snowEmitter.setPosition(this.cameras.main.scrollX, 0);
+  }
+}
+
+class LevelBase extends Phaser.Scene {
+  constructor(key) {
+    super(key);
+    this.levelKey = key;
+  }
+
+  init(data) {
+    this.playerKey = data.playerKey;
+    this.bgMusic = data.bgMusic;
+    this.jumpSound = data.jumpSound;
+    this.levelNumber = data.levelNumber || 1;
+  }
+
+  preload() {
+    this.load.spritesheet(this.playerKey, SPRITES.find(s => s.key === this.playerKey).url, { frameWidth: 240, frameHeight: 240 });
+
+    this.load.image('snowflake', 'https://i.imgur.com/YWZ7i8f.png');
+    this.load.image('ground', 'https://labs.phaser.io/assets/sprites/platform.png');
+    this.load.image('flag', 'https://i.postimg.cc/8Cz5C1ZQ/flag.png');
+
+    this.coinImages = [
+      'https://i.imgur.com/QlG8Y7B.png',
+      'https://i.imgur.com/ITvsEA8.png',
+      'https://i.imgur.com/AIb5FMJ.png',
+      'https://i.imgur.com/GLKj1Gy.png',
+      'https://i.imgur.com/7pRZqXf.png',
+      'https://i.imgur.com/7GxT1FD.png',
+      'https://i.imgur.com/9aS3DZ4.png',
+      'https://i.imgur.com/4U66ueO.png',
+    ];
+    this.coinImages.forEach((url, idx) => {
+      this.load.image('coin' + idx, url);
+    });
+
+    this.load.audio('coinSound', 'https://labs.phaser.io/assets/audio/SoundEffects/p-ping.mp3');
+    this.load.audio('jumpSound', 'https://Kakuzatoh.github.io/Kakuzato-Monogatari/Audio/jump.mp3');
+  }
+
+  create() {
+    this.add.text(20, 20, `Taso: ${this.levelNumber}`, { fontSize: '24px', fill: '#fff' }).setScrollFactor(0);
+
+    this.snowEmitter = this.add.particles(0, 0, 'snowflake', {
+      x: { min: 0, max: 800 },
+      y: 0,
+      lifespan: 6000,
+      speedY: { min: 100, max: 150 },
+      scale: { start: 0.03, end: 0.03 },
+      quantity: 4,
+      frequency: 100,
+      blendMode: 'NORMAL'
+    }).setDepth(-1);
+
+    this.ground = this.physics.add.staticGroup();
+
+    const levelData = this.getLevelData(this.levelNumber);
+
+    // Korjattu maa + kuopat: kuopat ovat koko maan paksuisia aukkoja ilman maan päälle jäävää maata
+    const groundHeight = 50; // maan korkeus pikseleinä
+    for(let i=0; i < levelData.platformCount; i++) {
+      const platformX = i * levelData.platformWidth;
+      const platformY = levelData.platformHeights[i];
+
+      if (levelData.gapIndices.includes(i)) {
+        // Kuoppa: ei lisätä maata ollenkaan, vaan piiretään musta aukko
+        const graphics = this.add.graphics();
+        graphics.fillStyle(0x000000, 1);
+        graphics.fillRect(platformX, platformY, levelData.gapWidth, groundHeight);
+      } else {
+        // Tavallinen maa: lisätään maalaattoja maan paksuudella
+        const tileWidth = 70; // ground sprite leveys
+        const tilesCount = Math.floor(levelData.platformWidth / tileWidth);
+        for (let t = 0; t < tilesCount; t++) {
+          const x = platformX + t * tileWidth + tileWidth / 2;
+          const groundTile = this.ground.create(x, platformY + groundHeight/2, 'ground');
+          groundTile.setScale(1, 1);
+          groundTile.refreshBody();
+        }
+      }
+    }
+
+    // Pelaaja alustetaan ensimmäisen alustan päälle
+    this.player = this.physics.add.sprite(100, levelData.platformHeights[0] - 150, this.playerKey);
+    this.player.setScale(0.27).setCrop(20, 0, 200, 230);
+    this.player.body.setSize(100, 180).setOffset(60, 40);
+    this.player.setCollideWorldBounds(false);
+
+    this.createAnimationsForPlayer();
+    this.player.play('idle');
+
+    this.physics.add.collider(this.player, this.ground);
+
+    // Tarkistetaan putoaminen kuoppaan pelimaailman päivityksessä
+    this.physics.world.on('worldstep', () => {
+      let onGroundOrPlatform = false;
+      const playerBottom = this.player.y + this.player.displayHeight / 2;
+
+      for(let i=0; i < levelData.platformCount; i++) {
+        const platformX = i * levelData.platformWidth;
+        const platformY = levelData.platformHeights[i];
+
+        if (levelData.gapIndices.includes(i)) {
+          // Pelaaja kuopassa?
+          if (this.player.x > platformX && this.player.x < platformX + levelData.gapWidth) {
+            if (playerBottom > platformY + 10) {
+              this.restart();
+              return;
+            }
+          }
+        } else {
+          // Pelaaja alustalla
+          if (this.player.x > platformX && this.player.x < platformX + levelData.platformWidth) {
+            if (playerBottom >= platformY - 5 && playerBottom <= platformY + 40) {
+              onGroundOrPlatform = true;
+            }
+          }
+        }
+      }
+
+      // Jos ei alustalla eikä kuopassa, mutta putoaa kentän alapuolelle
+      if (!onGroundOrPlatform && playerBottom > 600) {
+        this.restart();
+      }
+    });
+
+    // Kolikot ja niiden keräys
+    this.coins = this.physics.add.group({ allowGravity: false, immovable: true });
+
+    levelData.coinPositions.forEach((pos, i) => {
+      if (pos.platformIndex < levelData.platformHeights.length) {
+        const coinY = levelData.platformHeights[pos.platformIndex] + pos.yOffset;
+        const coin = this.coins.create(pos.x, coinY, 'coin' + (i % this.coinImages.length));
+        coin.setCircle(16);
+        coin.setScale(0.1);
+        coin.body.setSize(32, 32);
+        coin.body.setOffset(0, 0);
+      }
+    });
+
+    this.coinSound = this.sound.add('coinSound');
+    this.coinCount = 0;
+    this.coinText = this.add.text(16, 64, 'Coins: 0', { fontSize: '18px', fill: '#ffff00' }).setScrollFactor(0);
+
+    this.physics.add.overlap(this.player, this.coins, this.collectCoin, null, this);
+
+    // Lippu kentän loppuun
+    const lastPlatformX = (levelData.platformCount - 1) * levelData.platformWidth + levelData.platformWidth / 2;
+    const lastPlatformY = levelData.platformHeights[levelData.platformCount - 1];
+    this.flag = this.physics.add.staticSprite(lastPlatformX + 150, lastPlatformY - 80, 'flag').setDisplaySize(40, 60);
+
+    this.physics.add.collider(this.player, this.flag, () => this.levelComplete());
+
+    this.cameras.main.startFollow(this.player, true, 0.05, 0.05);
+    this.cameras.main.setBounds(0, 0, levelData.platformCount * levelData.platformWidth + 400, 600);
+
+    this.cursors = this.input.keyboard.createCursorKeys();
+
+    this.score = 0;
+    this.scoreText = this.add.text(16, 16, 'Obstacles Cleared: 0', { fontSize: '18px', fill: '#fff' }).setScrollFactor(0);
+    this.passedGaps = new Set();
+
+    this.levelData = levelData;
+  }
+
+  getLevelData(levelNumber) {
+    switch(levelNumber) {
+      case 1:
+        return {
+          platformCount: 10,
+          platformWidth: 400,
+          gapWidth: 80,
+          platformHeights: [550, 530, 510, 490, 470, 450, 430, 410, 390, 370],
+          gapIndices: [2, 5, 7],
+          coinPositions: [
+            { x: 350, platformIndex: 0, yOffset: -80 },
+            { x: 810, platformIndex: 3, yOffset: -80 },
+            { x: 1400, platformIndex: 6, yOffset: -80 },
+          ],
+        };
+      case 2:
+        return {
+          platformCount: 12,
+          platformWidth: 400,
+          gapWidth: 80,
+          platformHeights: [550, 540, 530, 520, 510, 500, 490, 480, 470, 460, 450, 440],
+          gapIndices: [3, 6, 9],
+          coinPositions: [
+            { x: 500, platformIndex: 1, yOffset: -80 },
+            { x: 1100, platformIndex: 5, yOffset: -80 },
+            { x: 1500, platformIndex: 10, yOffset: -80 },
+          ],
+        };
+      default:
+        return {
+          platformCount: 8,
+          platformWidth: 400,
+          gapWidth: 80,
+          platformHeights: [550, 530, 510, 490, 470, 450, 430, 410],
+          gapIndices: [2, 5],
+          coinPositions: [
+            { x: 300, platformIndex: 0, yOffset: -80 },
+            { x: 900, platformIndex: 3, yOffset: -80 },
+          ],
+        };
+    }
+  }
+
+  createAnimationsForPlayer() {
+    this.anims.create({
+      key: 'idle',
+      frames: this.anims.generateFrameNumbers(this.playerKey, { start: 6, end: 8 }),
+      frameRate: 6,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'walk',
+      frames: this.anims.generateFrameNumbers(this.playerKey, { start: 0, end: 2 }),
+      frameRate: 10,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'jump',
+      frames: this.anims.generateFrameNumbers(this.playerKey, { start: 3, end: 5 }),
+      frameRate: 6,
+      repeat: -1,
+    });
+  }
+
+  collectCoin(player, coin) {
+    coin.disableBody(true, true);
+    this.coinSound.play();
+    this.coinCount++;
+    this.coinText.setText(`Coins: ${this.coinCount}`);
+  }
+
+  levelComplete() {
+    this.bgMusic.pause();
+    this.add.text(this.cameras.main.scrollX + 300, 200, 'Voitit pelin!', { fontSize: '48px', fill: '#ff0' });
+    this.scene.pause();
+  }
+
+  restart() {
+    this.bgMusic.pause();
+    this.scene.restart({
+      playerKey: this.playerKey,
+      bgMusic: this.bgMusic,
+      jumpSound: this.jumpSound,
+      levelNumber: this.levelNumber
+    });
+  }
+
+  update() {
+    if (!this.player) return;
+    if (this.cursors.left.isDown) {
+      this.player.setVelocityX(-250);
+      if (this.player.body.onFloor()) this.player.play('walk', true);
+      this.player.setFlipX(true);
+    } else if (this.cursors.right.isDown) {
+      this.player.setVelocityX(250);
+      if (this.player.body.onFloor()) this.player.play('walk', true);
+      this.player.setFlipX(false);
+    } else {
+      this.player.setVelocityX(0);
+      if (this.player.body.onFloor()) this.player.play('idle', true);
+    }
+
+    if ((this.cursors.up.isDown || this.cursors.space.isDown) && this.player.body.onFloor()) {
+      this.player.setVelocityY(-450);
+      this.jumpSound.play();
+      this.player.play('jump');
+    }
+
+    this.snowEmitter.setPosition(this.cameras.main.scrollX, 0);
+  }
+}
+
+class Level1 extends LevelBase {
+  constructor() { super('Level1'); }
+}
+
+class Level2 extends LevelBase {
+  constructor() { super('Level2'); }
+}
+
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  physics: { default: 'arcade', arcade: { gravity: { y: 800 }, debug: false }},
+  scene: [TitleScreen, CharacterSelect, Level1, Level2]
+};
+
+const game = new Phaser.Game(config);
+</script>
+
+</body>
+</html>
